@@ -13,5 +13,5 @@
 	],
 	"show_encoding": true,
 	"show_line_endings": true,
-	"trim_trailing_white_space_on_save": true
+	"trim_trailing_white_space_on_save": false
 }
