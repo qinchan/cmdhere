@@ -10,7 +10,7 @@
 		"phuslu-8",
 		"phuslu-9",
 	],
-	// "DisableHTTP2": true,
+	"DisableHTTP2": true,
 	// "EnableRemoteDNS": true,
 	// "ForceHTTP2": true,
 	// "SSLVerify": true,
