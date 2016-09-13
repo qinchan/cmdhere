@@ -4,6 +4,7 @@ alias mv='mv -i'
 alias cp='cp -i'
 eval `dircolors`
 declare PROMPT_COMMAND="history -a;history -r"
+export HISTTIMEFORMAT="%Y-%m-%d %T "
 
 if [[ "xterm-256color xterm screen rxvt cygwin" == *"$TERM"* ]] ; then
     bind '"\e[B": history-search-forward'
