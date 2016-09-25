@@ -23,3 +23,9 @@ if [[ "xterm-256color xterm screen rxvt cygwin" == *"$TERM"* ]] ; then
         export PS1='\[\e]0;\h:\w\a\]\n\[\e[01;32m\]\u@\h\[\e[00;33m\] \w\n\[\e[1;$((31+3*!$?))m\]\$\[\e[00m\] '
     fi
 fi
+
+if [[ "${TERM}" != "screen" ]] && type -p tmux &>/dev/null ; then
+    if tmux has-session 0 &>/dev/null ; then
+        tmux attach 0
+    fi
+fi
