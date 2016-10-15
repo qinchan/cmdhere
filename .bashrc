@@ -1,14 +1,17 @@
-alias ls='ls --color=auto'
+[[ ${HOME1} == /Users/* ]] && alias ls='ls -G' || alias ls='ls --color=auto'
 alias rm='rm -i'
 alias mv='mv -i'
 alias cp='cp -i'
 eval `dircolors`
 declare PROMPT_COMMAND="history -a;history -r"
 export HISTTIMEFORMAT="%Y-%m-%d %T "
+export HISTCONTROL=ignoredups
+shopt -s checkwinsize
 
 if [[ "xterm-256color xterm screen rxvt cygwin" == *"$TERM"* ]] ; then
     bind '"\e[B": history-search-forward'
     bind '"\e[A": history-search-backward'
+    set bell-style none
     set show-all-if-ambiguous on
     set completion-ignore-case on
     if [ -f ~/.git-completion.bash ]; then
