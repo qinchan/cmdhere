@@ -1,4 +1,4 @@
-[[ ${HOME1} == /Users/* ]] && alias ls='ls -G' || alias ls='ls --color=auto'
+[[ ${HOME} == /Users/* ]] && alias ls='ls -G' || alias ls='ls --color=auto'
 alias rm='rm -i'
 alias mv='mv -i'
 alias cp='cp -i'
