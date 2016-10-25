@@ -1,4 +1,4 @@
-[[ ${HOME} == /Users/* ]] && alias ls='ls -G' || alias ls='ls --color=auto'
+[[ ${HOME} == /Users/* ]] && alias ls='ls -G' || alias ls='ls -ph --color=auto'
 alias rm='rm -i'
 alias mv='mv -i'
 alias cp='cp -i'
@@ -24,5 +24,9 @@ if [[ "xterm-256color xterm screen rxvt cygwin" == *"$TERM"* ]] ; then
         export PS1='\[\e]0;\h:\w\a\]\n\[\e[01;32m\]\u@\h\[\e[00;33m\] \w$(__git_ps1 " (%s)")\n\[\e[1;$((31+3*!$?))m\]\$\[\e[00m\] '
     else
         export PS1='\[\e]0;\h:\w\a\]\n\[\e[01;32m\]\u@\h\[\e[00;33m\] \w\n\[\e[1;$((31+3*!$?))m\]\$\[\e[00m\] '
+    fi
+    if [ -f ~/.z.sh ]; then
+        #curl -Lf https://raw.githubusercontent.com/rupa/z/master/z.sh >~/.z.sh
+        source ~/.z.sh
     fi
 fi
