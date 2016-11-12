@@ -198,33 +198,9 @@ function test_io()
   return($time);
 }
 
-function GetCoreInformation() {$data = file('/proc/stat');$cores = array();foreach( $data as $line ) {if( preg_match('/^cpu[0-9]/', $line) ){$info = explode(' ', $line);$cores[]=array('user'=>$info[1],'nice'=>$info[2],'sys' => $info[3],'idle'=>$info[4],'iowait'=>$info[5],'irq' => $info[6],'softirq' => $info[7]);}}return $cores;}
-function GetCpuPercentages($stat1, $stat2) {if(count($stat1)!==count($stat2)){return;}$cpus=array();for( $i = 0, $l = count($stat1); $i < $l; $i++) { $dif = array(); $dif['user'] = $stat2[$i]['user'] - $stat1[$i]['user'];$dif['nice'] = $stat2[$i]['nice'] - $stat1[$i]['nice'];  $dif['sys'] = $stat2[$i]['sys'] - $stat1[$i]['sys'];$dif['idle'] = $stat2[$i]['idle'] - $stat1[$i]['idle'];$dif['iowait'] = $stat2[$i]['iowait'] - $stat1[$i]['iowait'];$dif['irq'] = $stat2[$i]['irq'] - $stat1[$i]['irq'];$dif['softirq'] = $stat2[$i]['softirq'] - $stat1[$i]['softirq'];$total = array_sum($dif);$cpu = array();foreach($dif as $x=>$y) $cpu[$x] = round($y / $total * 100, 2);$cpus['cpu' . $i] = $cpu;}return $cpus;}
-$stat1 = GetCoreInformation();sleep(1);$stat2 = GetCoreInformation();$data = GetCpuPercentages($stat1, $stat2);
-$cpu_show = $data['cpu0']['user']."%us,  ".$data['cpu0']['sys']."%sy,  ".$data['cpu0']['nice']."%ni, ".$data['cpu0']['idle']."%id,  ".$data['cpu0']['iowait']."%wa,  ".$data['cpu0']['irq']."%irq,  ".$data['cpu0']['softirq']."%softirq";
-function makeImageUrl($title, $data) {$api='http://api.yahei.net/tz/cpu_show.php?id=';$url.=$data['user'].',';$url.=$data['nice'].',';$url.=$data['sys'].',';$url.=$data['idle'].',';$url.=$data['iowait'];$url.='&chdl=User|Nice|Sys|Idle|Iowait&chdlp=b&chl=';$url.=$data['user'].'%25|';$url.=$data['nice'].'%25|';$url.=$data['sys'].'%25|';$url.=$data['idle'].'%25|';$url.=$data['iowait'].'%25';$url.='&chtt=Core+'.$title;return $api.base64_encode($url);}
-if($_GET['act'] == "cpu_percentage"){echo "<center><b><font face='Microsoft YaHei' color='#666666' size='3'>图片加载慢，请耐心等待！</font></b><br /><br />";foreach( $data as $k => $v ) {echo '<img src="' . makeImageUrl( $k, $v ) . '" style="width:360px;height:240px;border: #CCCCCC 1px solid;background: #FFFFFF;margin:5px;padding:5px;" />';}echo "</center>";exit();}
-
-// 根据不同系统取得CPU相关信息
-switch(PHP_OS)
-{
-  case "Linux":
-    $sysReShow = (false !== ($sysInfo = sys_linux()))?"show":"none";
-  break;
-
-  case "FreeBSD":
-    $sysReShow = (false !== ($sysInfo = sys_freebsd()))?"show":"none";
-  break;
-/*
-  case "WINNT":
-    $sysReShow = (false !== ($sysInfo = sys_windows()))?"show":"none";
-  break;
-*/
-  default:
-  break;
-}
-
 //linux系统探测
+$sysInfo = sys_linux();
+
 function sys_linux()
 {
     // CPU
@@ -327,174 +303,6 @@ function sys_linux()
     return $res;
 }
 
-//FreeBSD系统探测
-function sys_freebsd()
-{
-  //CPU
-  if (false === ($res['cpu']['num'] = get_key("hw.ncpu"))) return false;
-  $res['cpu']['model'] = get_key("hw.model");
-  //LOAD AVG
-  if (false === ($res['loadAvg'] = get_key("vm.loadavg"))) return false;
-  //UPTIME
-  if (false === ($buf = get_key("kern.boottime"))) return false;
-  $buf = explode(' ', $buf);
-  $sys_ticks = time() - intval($buf[3]);
-  $min = $sys_ticks / 60;
-  $hours = $min / 60;
-  $days = floor($hours / 24);
-  $hours = floor($hours - ($days * 24));
-  $min = floor($min - ($days * 60 * 24) - ($hours * 60));
-  if ($days !== 0) $res['uptime'] = $days."天";
-  if ($hours !== 0) $res['uptime'] .= $hours."小时";
-  $res['uptime'] .= $min."分钟";
-  //MEMORY
-  if (false === ($buf = get_key("hw.physmem"))) return false;
-  $res['memTotal'] = round($buf/1024/1024, 2);
-
-  $str = get_key("vm.vmtotal");
-  preg_match_all("/\nVirtual Memory[\:\s]*\(Total[\:\s]*([\d]+)K[\,\s]*Active[\:\s]*([\d]+)K\)\n/i", $str, $buff, PREG_SET_ORDER);
-  preg_match_all("/\nReal Memory[\:\s]*\(Total[\:\s]*([\d]+)K[\,\s]*Active[\:\s]*([\d]+)K\)\n/i", $str, $buf, PREG_SET_ORDER);
-
-  $res['memRealUsed'] = round($buf[0][2]/1024, 2);
-  $res['memCached'] = round($buff[0][2]/1024, 2);
-  $res['memUsed'] = round($buf[0][1]/1024, 2) + $res['memCached'];
-  $res['memFree'] = $res['memTotal'] - $res['memUsed'];
-  $res['memPercent'] = (floatval($res['memTotal'])!=0)?round($res['memUsed']/$res['memTotal']*100,2):0;
-
-  $res['memRealPercent'] = (floatval($res['memTotal'])!=0)?round($res['memRealUsed']/$res['memTotal']*100,2):0;
-
-  return $res;
-}
-
-//取得参数值 FreeBSD
-function get_key($keyName)
-{
-  return do_command('sysctl', "-n $keyName");
-}
-
-//确定执行文件位置 FreeBSD
-function find_command($commandName)
-{
-  $path = array('/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin', '/usr/local/sbin');
-  foreach($path as $p)
-  {
-    if (@is_executable("$p/$commandName")) return "$p/$commandName";
-  }
-  return false;
-}
-
-//执行系统命令 FreeBSD
-function do_command($commandName, $args)
-{
-  $buffer = "";
-  if (false === ($command = find_command($commandName))) return false;
-  if ($fp = @popen("$command $args", 'r'))
-  {
-    while (!@feof($fp))
-    {
-      $buffer .= @fgets($fp, 4096);
-    }
-    return trim($buffer);
-  }
-  return false;
-}
-
-//windows系统探测
-function sys_windows()
-{
-  if (PHP_VERSION >= 5)
-  {
-    $objLocator = new COM("WbemScripting.SWbemLocator");
-    $wmi = $objLocator->ConnectServer();
-    $prop = $wmi->get("Win32_PnPEntity");
-  }
-  else
-  {
-    return false;
-  }
-
-  //CPU
-  $cpuinfo = GetWMI($wmi,"Win32_Processor", array("Name","L2CacheSize","NumberOfCores"));
-  $res['cpu']['num'] = $cpuinfo[0]['NumberOfCores'];
-  if (null == $res['cpu']['num'])
-  {
-    $res['cpu']['num'] = 1;
-  }/*
-  for ($i=0;$i<$res['cpu']['num'];$i++)
-  {
-    $res['cpu']['model'] .= $cpuinfo[0]['Name']."<br />";
-    $res['cpu']['cache'] .= $cpuinfo[0]['L2CacheSize']."<br />";
-  }*/
-  $cpuinfo[0]['L2CacheSize'] = ' ('.$cpuinfo[0]['L2CacheSize'].')';
-  if($res['cpu']['num']==1)
-    $x1 = '';
-  else
-    $x1 = ' ×'.$res['cpu']['num'];
-  $res['cpu']['model'] = $cpuinfo[0]['Name'].$cpuinfo[0]['L2CacheSize'].$x1;
-  // SYSINFO
-  $sysinfo = GetWMI($wmi,"Win32_OperatingSystem", array('LastBootUpTime','TotalVisibleMemorySize','FreePhysicalMemory','Caption','CSDVersion','SerialNumber','InstallDate'));
-  $sysinfo[0]['Caption']=iconv('GBK', 'UTF-8',$sysinfo[0]['Caption']);
-  $sysinfo[0]['CSDVersion']=iconv('GBK', 'UTF-8',$sysinfo[0]['CSDVersion']);
-  $res['win_n'] = $sysinfo[0]['Caption']." ".$sysinfo[0]['CSDVersion']." 序列号:{$sysinfo[0]['SerialNumber']} 于".date('Y年m月d日H:i:s',strtotime(substr($sysinfo[0]['InstallDate'],0,14)))."安装";
-  //UPTIME
-  $res['uptime'] = $sysinfo[0]['LastBootUpTime'];
-
-  $sys_ticks = 3600*8 + time() - strtotime(substr($res['uptime'],0,14));
-  $min = $sys_ticks / 60;
-  $hours = $min / 60;
-  $days = floor($hours / 24);
-  $hours = floor($hours - ($days * 24));
-  $min = floor($min - ($days * 60 * 24) - ($hours * 60));
-  if ($days !== 0) $res['uptime'] = $days."天";
-  if ($hours !== 0) $res['uptime'] .= $hours."小时";
-  $res['uptime'] .= $min."分钟";
-
-  //MEMORY
-  $res['memTotal'] = round($sysinfo[0]['TotalVisibleMemorySize']/1024,2);
-  $res['memFree'] = round($sysinfo[0]['FreePhysicalMemory']/1024,2);
-  $res['memUsed'] = $res['memTotal']-$res['memFree']; //上面两行已经除以1024,这行不用再除了
-  $res['memPercent'] = round($res['memUsed'] / $res['memTotal']*100,2);
-
-  $swapinfo = GetWMI($wmi,"Win32_PageFileUsage", array('AllocatedBaseSize','CurrentUsage'));
-
-  // LoadPercentage
-  $loadinfo = GetWMI($wmi,"Win32_Processor", array("LoadPercentage"));
-  $res['loadAvg'] = $loadinfo[0]['LoadPercentage'];
-
-  return $res;
-}
-
-function GetWMI($wmi,$strClass, $strValue = array())
-{
-  $arrData = array();
-
-  $objWEBM = $wmi->Get($strClass);
-  $arrProp = $objWEBM->Properties_;
-  $arrWEBMCol = $objWEBM->Instances_();
-  foreach($arrWEBMCol as $objItem)
-  {
-    @reset($arrProp);
-    $arrInstance = array();
-    foreach($arrProp as $propItem)
-    {
-      eval("\$value = \$objItem->" . $propItem->Name . ";");
-      if (empty($strValue))
-      {
-        $arrInstance[$propItem->Name] = trim($value);
-      }
-      else
-      {
-        if (in_array($propItem->Name, $strValue))
-        {
-          $arrInstance[$propItem->Name] = trim($value);
-        }
-      }
-    }
-    $arrData[] = $arrInstance;
-  }
-  return $arrData;
-}
-
 //比例条
 function bar($percent)
 {
@@ -574,8 +382,36 @@ if ($_GET['act'] == "rt")
   echo $_GET['callback'],'(',$jarr,')';
   exit;
 }
+
+//ajax调用计算CPU使用率
+if ($_GET['act'] == "cpu")
+{
+  $duration = 1;
+
+  $stat1=array_slice(preg_split('/\s+/', trim(file('/proc/stat')[0])), 1);
+  sleep($duration);
+  $stat2=array_slice(preg_split('/\s+/', trim(file('/proc/stat')[0])), 1);
+
+  $diff=array_map(function ($x,$y) {return intval($y)-intval($x);}, $stat1, $stat2);
+  $total=array_sum($diff)/100;
+
+  $cpu=array();
+  $cpu['user'] = $diff[0]/$total;
+  $cpu['nice'] = $diff[1]/$total;
+  $cpu['sys'] = $diff[2]/$total;
+  $cpu['idle'] = $diff[3]/$total;
+  $cpu['iowait'] = $diff[4]/$total;
+  $cpu['irq'] = $diff[5]/$total;
+  $cpu['softirq'] = $diff[6]/$total;
+  $cpu['steal'] = $diff[7]/$total;
+
+  $jarr=json_encode($cpu);
+  $_GET['callback'] = htmlspecialchars($_GET['callback']);
+  echo $_GET['callback'],'(',$jarr,')';
+  exit;
+}
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <title><?php echo $_SERVER['SERVER_NAME']; ?></title>
@@ -623,7 +459,7 @@ input.btn{font-weight: bold; height: 20px; line-height: 20px; padding: 0 6px; co
 .word{word-break:break-all;}
 -->
 </style>
-<script language="JavaScript" type="text/javascript" src="http://lib.sinaapp.com/js/jquery/1.7/jquery.min.js"></script>
+<script src="//lib.sinaapp.com/js/jquery/1.7/jquery.min.js"></script>
 <script type="text/javascript">
 <!--
 $(document).ready(function(){getJSONData();});
@@ -711,6 +547,33 @@ function displayData(dataJSON)
   $("#NetInputSpeed4").html(ForDight((dataJSON.NetInputSpeed4-InputSpeed4),3)); InputSpeed4=dataJSON.NetInputSpeed4;
   $("#NetInputSpeed5").html(ForDight((dataJSON.NetInputSpeed5-InputSpeed5),3)); InputSpeed5=dataJSON.NetInputSpeed5;
 }
+$(document).ready(function(){getCPUJSONData();});
+function getCPUJSONData()
+{
+  setTimeout("getCPUJSONData()", 2000);
+  $.getJSON('?act=cpu&callback=?', displayCPUData);
+}
+function displayCPUData(dataJSON)
+{
+  $("#cpuUSER").html(dataJSON.user.toFixed(1));
+  $("#cpuSYS").html(dataJSON.sys.toFixed(1));
+  $("#cpuNICE").html(dataJSON.nice.toFixed(1));
+  $("#cpuIDLE").html(dataJSON.idle.toFixed(1).substring(0,4));
+  $("#cpuIOWAIT").html(dataJSON.iowait.toFixed(1));
+  $("#cpuIRQ").html(dataJSON.irq.toFixed(1));
+  $("#cpuSOFTIRQ").html(dataJSON.softirq.toFixed(1));
+  $("#cpuSTEAL").html(dataJSON.steal.toFixed(1));
+  
+  usage = 100 - (dataJSON.idle+dataJSON.iowait);
+  if (usage > 75)
+    $("#barcpuPercent").width(usage+'%').removeClass().addClass('barli_black');
+  else if (usage > 50)
+    $("#barcpuPercent").width(usage+'%').removeClass().addClass('barli_red');
+  else if (usage > 25)
+    $("#barcpuPercent").width(usage+'%').removeClass().addClass('barli_blue');
+  else
+    $("#barcpuPercent").width(usage+'%').removeClass().addClass('barli_green');
+}
 -->
 </script>
 </head>
@@ -723,8 +586,8 @@ function displayData(dataJSON)
 <table>
   <tr>
     <th class="w_logo">PHP探针</th>
-    <th class="w_top"><a href="/p.php">PHP 代理</a></th>
     <th class="w_top"><a href="/files/">文件下载</a></th>
+    <th class="w_top"><a href="/wol/">远程唤醒</a></th>
     <th class="w_top"><a href="/admin/">路由管理</a></th>
     <th class="w_top"><a href="/shell/">Shell in a box</a></th>
   </tr>
@@ -767,7 +630,6 @@ function displayData(dataJSON)
   </tr>
 </table>
 
-<?if("show"==$sysReShow){?>
 <table>
   <tr><th colspan="6">服务器实时数据</th></tr>
   <tr>
@@ -779,11 +641,6 @@ function displayData(dataJSON)
   <tr>
     <td width="13%">CPU型号 [<?php echo $sysInfo['cpu']['num'];?>核]</td>
     <td width="87%" colspan="5"><?php echo $sysInfo['cpu']['model'];?></td>
-  </tr>
-  <tr>
-    <td>CPU使用状况</td>
-    <td colspan="5"><?php if('/'==DIRECTORY_SEPARATOR){echo $cpu_show." | <a href='".$phpSelf."?act=cpu_percentage' target='_blank' class='static'>查看图表</a>";}else{echo "暂时只支持Linux系统";}?>
-  </td>
   </tr>
 <?php if (isset($sysInfo['boardVendor'])) : ?>
   <tr>
@@ -800,14 +657,18 @@ function displayData(dataJSON)
   </tr>
 <?php endif; ?>
   <tr>
-    <td>硬盘使用状况</td>
+    <td>CPU使用状况</td>
     <td colspan="5">
-    总空间 <?php echo $dt;?>&nbsp;G，
-    已用 <font color='#333333'><span id="useSpace"><?php echo $du;?></span></font>&nbsp;G，
-    空闲 <font color='#333333'><span id="freeSpace"><?php echo $df;?></span></font>&nbsp;G，
-    使用率 <span id="hdPercent"><?php echo $hdPercent;?></span>%
-    <div class="bar"><div id="barhdPercent" class="barli_black" style="width:<?php echo $hdPercent;?>%" >&nbsp;</div> </div>
-  </td>
+      <font id="cpuUSER" color="#CC0000">0.0</font> user, 
+      <font id="cpuSYS" color="#CC0000">0.0</font> sys, 
+      <font id="cpuNICE">0.0</font> nice, 
+      <font id="cpuIDLE" color="#CC0000">99.9</font> idle, 
+      <font id="cpuIOWAIT">0.0</font> iowait, 
+      <font id="cpuIRQ">0.0</font> irq, 
+      <font id="cpuSOFTIRQ">0.0</font> softirq, 
+      <font id="cpuSTEAL">0.0</font> steal 
+      <div class="bar"><div id="barcpuPercent" class="barli_green" style="width: 100%;">&nbsp;</div> </div>
+    </td>
   </tr>
   <tr>
     <td>内存使用状况</td>
@@ -872,12 +733,21 @@ if($sysInfo['swapTotal']>0)
 ?>
     </td>
   </tr>
+  <tr>
+    <td>硬盘使用状况</td>
+    <td colspan="5">
+    总空间 <?php echo $dt;?>&nbsp;G，
+    已用 <font color='#333333'><span id="useSpace"><?php echo $du;?></span></font>&nbsp;G，
+    空闲 <font color='#333333'><span id="freeSpace"><?php echo $df;?></span></font>&nbsp;G，
+    使用率 <span id="hdPercent"><?php echo $hdPercent;?></span>%
+    <div class="bar"><div id="barhdPercent" class="barli_black" style="width:<?php echo $hdPercent;?>%" >&nbsp;</div> </div>
+  </td>
+  </tr>
     <tr>
     <td>系统平均负载</td>
     <td colspan="5" class="w_number"><span id="loadAvg"><?php echo $load;?></span></td>
   </tr>
 </table>
-<?}?>
 
 <?php if (false !== ($strs = @file("/proc/net/dev"))) : ?>
 <table>
@@ -895,6 +765,39 @@ if($sysInfo['swapTotal']>0)
 </table>
 <?php endif; ?>
 
+<?php if (1 < count($strs = preg_split('/[\r\n]+/', shell_exec("arp -n 2>/dev/null")))) : ?>
+<table>
+    <tr><th colspan="5">网络邻居</th></tr>
+<?php for ($i = 1; $i < count($strs); $i++ ) : ?>
+<?php $info = preg_split('/\s+/', $strs[$i]);?>
+<?php if (5 == count($info)) : ?>
+     <tr>
+        <td width="13%"><?php echo gethostbyaddr($info[0]);?> </td>
+        <td width="29%">MAC: <font color='#CC0000'><?php echo $info[2];?></font></td>
+        <td width="14%">类型: <font color='#CC0000'><?php echo $info[1];?></font></td>
+        <td width="29%">接口: <font color='#CC0000'><?php echo $info[4];?></font></td>
+    </tr>
+<?php endif; ?>
+<?php endfor; ?>
+</table>
+<?php endif; ?>
+
+<?php if (2 < count($strs = preg_split('/[\r\n]+/', trim(shell_exec("w 2>/dev/null"))))) : ?>
+<table>
+    <tr><th colspan="6">已登录用户</th></tr>
+<?php for ($i = 2; $i < count($strs); $i++ ) : ?>
+<?php $info = preg_split('/\s+/', $strs[$i]);?>
+     <tr>
+        <td width="15%"><?php echo $info[0];?> </td>
+        <td width="15%">TTY: <font color='#CC0000'><?php echo $info[1];?></font></td>
+        <td width="25%">源地址: <font color='#CC0000'><?php echo $info[2];?></font></td>
+        <td width="15%">开始于: <font color='#CC0000'><?php echo $info[3];?></font></td>
+        <td width="15%">空闲: <font color='#CC0000'><?php echo $info[4];?></font></td>
+        <td width="15%">当前命令: <font color='#CC0000'><?php echo $info[7];?></font></td>
+    </tr>
+<?php endfor; ?>
+</table>
+<?php endif; ?>
 
 <a name="w_performance"></a><a name="bottom"></a>
 <form action="<?php echo $_SERVER['PHP_SELF']."#bottom";?>" method="post">
@@ -937,7 +840,7 @@ if($sysInfo['swapTotal']>0)
     <td align="left">2 x Pentium4 3.00GHz</td>
   </tr>
   <tr align="center">
-    <td align="left">埃及 CitynetHost.com</a></td>
+    <td align="left">埃及 CitynetHost.com</td>
     <td>0.343秒</td>
     <td>0.761秒</td>
     <td>0.023秒</td>
@@ -1019,6 +922,7 @@ if($sysInfo['swapTotal']>0)
     </td>
   </tr>
 </table>
+</form>
 
 <a name="w_php"></a>
 <table>
@@ -1140,12 +1044,12 @@ if($sysInfo['swapTotal']>0)
 
 <table>
   <tr>
-    <td class="w_foot"><A HREF="http://www.Yahei.Net" target="_blank"><?php echo $title.$version;?></A></td>
+    <td class="w_foot"><A href="https://github.com/phuslu/cmdhere" target="_blank"><?php echo $title.$version;?></A></td>
     <td class="w_foot"><?php $run_time = sprintf('%0.4f', microtime_float() - $time_start);?>Processed in <?php echo $run_time?> seconds. <?php echo memory_usage();?> memory usage.</td>
     <td class="w_foot"><a href="#w_top">返回顶部</a></td>
   </tr>
 </table>
 
-</div>
 </body>
 </html>
+
