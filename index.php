@@ -765,39 +765,79 @@ if($sysInfo['swapTotal']>0)
 </table>
 <?php endif; ?>
 
-<?php if (1 < count($strs = preg_split('/[\r\n]+/', shell_exec("arp -n 2>/dev/null")))) : ?>
+<?php if (0 < count($strs = array_splice(@file("/proc/net/arp"), 1))) : ?>
 <table>
     <tr><th colspan="5">网络邻居</th></tr>
-<?php for ($i = 1; $i < count($strs); $i++ ) : ?>
-<?php $info = preg_split('/\s+/', $strs[$i]);?>
-<?php if (5 == count($info)) : ?>
+<?php $seen = array(); ?>
+<?php for ($i = 0; $i < count($strs); $i++ ) : ?>
+<?php $info = preg_split('/\s+/', $strs[$i]); ?>
+<?php if ('0x2' == $info[2] && !isset($seen[$info[3]])) : ?>
+<?php $seen[$info[3]] = true; ?>
      <tr>
         <td width="13%"><?php echo gethostbyaddr($info[0]);?> </td>
-        <td width="29%">MAC: <font color='#CC0000'><?php echo $info[2];?></font></td>
-        <td width="14%">类型: <font color='#CC0000'><?php echo $info[1];?></font></td>
-        <td width="29%">接口: <font color='#CC0000'><?php echo $info[4];?></font></td>
+        <td width="29%">MAC: <font color='#CC0000'><?php  echo $info[3];?></font></td>
+        <td width="14%">类型: <font color='#CC0000'><?php echo $info[1]=='0x1'?'ether':$info[1];?></font></td>
+        <td width="29%">接口: <font color='#CC0000'><?php echo $info[5];?></font></td>
     </tr>
 <?php endif; ?>
 <?php endfor; ?>
 </table>
 <?php endif; ?>
 
-<?php if (2 < count($strs = preg_split('/[\r\n]+/', trim(shell_exec("w 2>/dev/null"))))) : ?>
+<?php
+$events = array();
+$i = 0;
+$lines = str_split(file_get_contents('/var/log/wtmp'), 384);
+foreach ($lines as $line)
+{
+  preg_match('/(.{4})(.{4})(.{32})(.{4})(.{32})(.{256})(.{4})(.{4})(.{4})(.{4})(.{4})/', $line, $matches);
+  $events[$i] = array();
+  $events[$i]['type'] = unpack('I', $matches[1])[1];
+  $events[$i]['pid'] = unpack('I', $matches[2])[1];
+  $events[$i]['line'] = trim($matches[3]);
+  $events[$i]['inittab'] = $matches[4];
+  $events[$i]['user'] = trim($matches[5]);
+  $events[$i]['host'] = trim($matches[6]);
+  $events[$i]['t1'] = $matches[7];
+  $events[$i]['t2'] = $matches[8];
+  $events[$i]['gmtime'] = unpack('I', $matches[9])[1];
+  $events[$i]['t4'] = $matches[10];
+  $events[$i]['t5'] = $matches[11];
+  $i++;
+}
+$events2 = array();
+foreach ($events as $event)
+{
+  if ($event['user'] == '')
+     continue;
+  switch ($event['type'])
+  {
+  case 7:
+    $events2[$event['line']] = $event;
+    break;
+  case 8:
+    unset($events2[$event['line']]);
+    break;
+  }
+}
+?>
+
+<?php if (0 < count($events2)) : ?>
 <table>
     <tr><th colspan="6">已登录用户</th></tr>
-<?php for ($i = 2; $i < count($strs); $i++ ) : ?>
-<?php $info = preg_split('/\s+/', $strs[$i]);?>
+<?php foreach ($events2 as $event ) : ?>
      <tr>
-        <td width="15%"><?php echo $info[0];?> </td>
-        <td width="15%">TTY: <font color='#CC0000'><?php echo $info[1];?></font></td>
-        <td width="25%">源地址: <font color='#CC0000'><?php echo $info[2];?></font></td>
-        <td width="15%">开始于: <font color='#CC0000'><?php echo $info[3];?></font></td>
-        <td width="15%">空闲: <font color='#CC0000'><?php echo $info[4];?></font></td>
-        <td width="15%">当前命令: <font color='#CC0000'><?php echo $info[7];?></font></td>
+        <td width="15%"><?php echo $event['user'];?></td>
+        <td width="15%">TTY: <font color='#CC0000'><?php echo $event['line'];?></font></td>
+        <td width="25%">源地址: <font color='#CC0000'><?php echo $event['host'];?></font></td>
+        <td width="15%">开始于: <font color='#CC0000'><?php echo gmstrftime('%m-%d %H:%M', $event['gmtime']);?></font></td>
+        <td width="15%">空闲: <font color='#CC0000'><?php echo '';?></font></td>
+        <td width="15%">当前命令: <font color='#CC0000'><?php echo $event['pid'];?></font></td>
     </tr>
-<?php endfor; ?>
+<?php endforeach; ?>
 </table>
 <?php endif; ?>
+
 
 <a name="w_performance"></a><a name="bottom"></a>
 <form action="<?php echo $_SERVER['PHP_SELF']."#bottom";?>" method="post">
